@@ -1,73 +1,110 @@
-# Welcome to your Lovable project
+# Exchange Ease - Book Swap Platform
 
-## Project info
+Exchange Ease is a modern web application that enables users to swap books with other readers in their community. Users can list their books, browse available books, and arrange exchanges with other book enthusiasts.
 
-**URL**: https://lovable.dev/projects/031f3b84-5521-4a52-bc31-7f9be30eac03
+## 🚀 Getting Started
 
-## How can I edit this code?
+### Prerequisites
+- Node.js (v18 or higher)
+- npm (Node Package Manager)
+- Supabase account for database
 
-There are several ways of editing your application.
+### Installation Steps
 
-**Use Lovable**
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Jagadesh17/exchangeease.git
+   cd exchangeease
+   ```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/031f3b84-5521-4a52-bc31-7f9be30eac03) and start prompting.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Changes made via Lovable will be committed automatically to this repo.
+3. **Environment Setup**
+   - Create a `.env` file in the root directory
+   - Add your Supabase credentials:
+     ```env
+     VITE_SUPABASE_URL=your_supabase_url
+     VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+     ```
 
-**Use your preferred IDE**
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+5. **Build for production**
+   ```bash
+   npm run build
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Technologies Used
 
-Follow these steps:
+### Frontend
+- **React 18** - UI Library
+- **TypeScript** - Programming Language
+- **Vite** - Build Tool
+- **Tailwind CSS** - Styling
+- **Shadcn/ui** - UI Components
+- **React Router** - Navigation
+- **Lucide React** - Icons
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Backend & Database
+- **Supabase**
+  - Authentication
+  - Database
+  - Real-time subscriptions
+  - Storage for images
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### State Management & Utilities
+- **React Context** - Global state management
+- **React Query** - Server state management
+- **Zod** - Schema validation
+- **date-fns** - Date formatting
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🌐 Platforms & Tools
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+### Development
+- **VS Code** - Code Editor
+- **Git** - Version Control
+- **GitHub** - Code Repository
 
-**Edit a file directly in GitHub**
+### Deployment & Hosting
+- **Netlify** - Frontend Hosting
+- **Supabase** - Backend as a Service
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🔐 Authentication
 
-**Use GitHub Codespaces**
+The application uses Supabase Authentication with the following features:
+- Email/Password Sign up and Login
+- Password Reset
+- Protected Routes
+- User Profile Management
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📱 Features
 
-## What technologies are used for this project?
+- User Authentication
+- Book Listing and Management
+- Real-time Chat System
+- Book Matching System
+- Profile Management
+- Responsive Design
+- Dark/Light Mode
 
-This project is built with:
+## 🔄 Database Schema
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The application uses the following main tables in Supabase:
+- `profiles` - User profiles
+- `books` - Book listings
+- `matches` - Book swap matches
+- `messages` - Chat messages
 
-## How can I deploy this project?
+## 🚀 Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/031f3b84-5521-4a52-bc31-7f9be30eac03) and click on Share -> Publish.
+The application is deployed on Netlify with continuous deployment from the main branch. Any push to the main branch automatically triggers a new deployment.
 
-## Can I connect a custom domain to my Lovable project?
+## 📝 License
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License.
