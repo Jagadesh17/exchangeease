@@ -1,4 +1,3 @@
-
 import { BookProps } from "@/components/book/BookCard";
 
 export const MOCK_BOOKS: BookProps[] = [
@@ -11,7 +10,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Fiction",
     owner: {
       name: "Alex Johnson",
-      avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.8
     }
   },
@@ -24,7 +23,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Science Fiction",
     owner: {
       name: "Maya Rodriguez",
-      avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.5
     }
   },
@@ -37,7 +36,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Fantasy",
     owner: {
       name: "Thomas Lee",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.9
     }
   },
@@ -50,7 +49,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Self-Help",
     owner: {
       name: "Sarah Johnson",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.7
     }
   },
@@ -63,7 +62,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Mystery",
     owner: {
       name: "David Chen",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.6
     }
   },
@@ -76,7 +75,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Fiction",
     owner: {
       name: "Emily Wilson",
-      avatar: "https://images.unsplash.com/photo-1629747490241-624f07d70e1e?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.9
     }
   },
@@ -89,7 +88,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "History",
     owner: {
       name: "Michael Brown",
-      avatar: "https://images.unsplash.com/photo-1603415526960-f7e0328c63b1?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.7
     }
   },
@@ -102,7 +101,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Mystery",
     owner: {
       name: "Jessica Park",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.8
     }
   },
@@ -115,7 +114,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Science Fiction",
     owner: {
       name: "Ryan Scott",
-      avatar: "https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.6
     }
   },
@@ -128,7 +127,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Finance",
     owner: {
       name: "Laura Kim",
-      avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.9
     }
   },
@@ -141,7 +140,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Fantasy",
     owner: {
       name: "Daniel White",
-      avatar: "https://images.unsplash.com/photo-1537815749002-de6a533c64db?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.7
     }
   },
@@ -154,7 +153,7 @@ export const MOCK_BOOKS: BookProps[] = [
     genre: "Biography",
     owner: {
       name: "Amanda Taylor",
-      avatar: "https://images.unsplash.com/photo-1553514029-1318c9127859?w=60&h=60&auto=format&fit=crop",
+      avatar: "",
       rating: 4.8
     }
   },

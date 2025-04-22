@@ -51,7 +51,7 @@ const Profile = () => {
     email: profile?.email || "",
     location: profile?.location || "",
     bio: profile?.bio || "",
-    profilePic: profile?.profile_pic || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&auto=format&fit=crop",
+    profilePic: profile?.profile_pic || "",
   });
   const [selectedPicFile, setSelectedPicFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +63,7 @@ const Profile = () => {
         email: profile.email || "",
         location: profile.location || "",
         bio: profile.bio || "",
-        profilePic: profile.profile_pic || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&auto=format&fit=crop",
+        profilePic: profile.profile_pic || "",
       });
       setSelectedPicFile(null);
     }
