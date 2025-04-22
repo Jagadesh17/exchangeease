@@ -25,14 +25,43 @@ export async function sendMessage(senderId: string, receiverId: string, content:
 // Function to fetch conversation between two users
 export async function fetchConversation(userId: string, otherUserId: string) {
   try {
-    const { data, error } = await supabase
+    const { data: messages, error } = await supabase
       .from('messages')
-      .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+      .select('*')
       .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+
+    // After getting messages, fetch user profiles
+    const userIds = new Set([userId, otherUserId]);
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, profile_pic')
+      .in('id', Array.from(userIds));
+
+    if (profilesError) throw profilesError;
+
+    // Create a map of user profiles
+    const profileMap = new Map(profiles?.map(profile => [profile.id, profile]));
+
+    // Combine messages with profile information
+    const messagesWithProfiles = messages?.map(message => ({
+      ...message,
+      sender: profileMap.get(message.sender_id),
+      receiver: profileMap.get(message.receiver_id)
+    })) || [];
+
+    // Mark received messages as read
+    const unreadMessages = messages?.filter(
+      msg => msg.receiver_id === userId && !msg.read
+    ) || [];
+
+    if (unreadMessages.length > 0) {
+      await markMessagesAsRead(userId, otherUserId);
+    }
+
+    return messagesWithProfiles;
   } catch (error) {
     console.error('Error fetching conversation:', error);
     throw error;

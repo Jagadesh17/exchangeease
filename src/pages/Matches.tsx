@@ -18,6 +18,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { ChatDialog } from "@/components/chat/ChatDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchUserMatches, respondToMatch, subscribeToMatches } from "@/utils/matches";
@@ -31,6 +32,8 @@ interface MatchBookProps {
   cover: string;
   condition: 'New' | 'Good' | 'Worn';
   genre: string;
+  user_id: string;
+  owner_name: string;
 }
 
 interface DatabaseBook {
@@ -52,6 +55,11 @@ interface DatabaseMatch {
   book_offered_id: string | null;
   requested_book: DatabaseBook;
   offered_book: DatabaseBook | null;
+  requester?: {
+    id: string;
+    name: string;
+    profile_pic: string | null;
+  };
 }
 
 interface UserProfile {
@@ -81,6 +89,10 @@ const Matches = () => {
   const [receivedMatches, setReceivedMatches] = useState<MatchProps[]>([]);
   const [requestedMatches, setRequestedMatches] = useState<MatchProps[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedChat, setSelectedChat] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
 
   // Debug logging for user state
   useEffect(() => {
@@ -123,35 +135,49 @@ const Matches = () => {
         timestamp: new Date().toISOString()
       });
 
-      // First, check if we can connect to Supabase
-      const { data: connectionTest, error: connectionError } = await supabase
-        .from('books')
-        .select('count')
-        .limit(1);
-
-      if (connectionError) {
-        console.error('Database connection test failed:', connectionError);
-        throw new Error(`Database connection failed: ${connectionError.message}`);
-      }
-
-      // Test if matches table exists
-      const { error: matchesTableError } = await supabase
+      // First, verify the matches table exists and we can access it
+      console.log('Checking matches table access...');
+      const { data: matchesCheck, error: matchesCheckError } = await supabase
         .from('matches')
-        .select('count')
+        .select('id')
         .limit(1);
 
-      if (matchesTableError) {
-        console.error('Matches table test failed:', matchesTableError);
-        if (matchesTableError.code === '42P01') {
-          throw new Error('The matches table does not exist in the database. Please set up the database first.');
-        } else {
-          throw new Error(`Matches table error: ${matchesTableError.message}`);
-        }
+      if (matchesCheckError) {
+        console.error('Error accessing matches table:', matchesCheckError);
+        throw new Error(`Cannot access matches table: ${matchesCheckError.message}`);
       }
 
-      console.log('Database connection and table check successful, fetching matches...');
-      
-      // Get matches where user is the requester
+      console.log('Matches table check successful:', matchesCheck);
+
+      // Now check books table
+      console.log('Checking books table access...');
+      const { data: booksCheck, error: booksCheckError } = await supabase
+        .from('books')
+        .select('id')
+        .limit(1);
+
+      if (booksCheckError) {
+        console.error('Error accessing books table:', booksCheckError);
+        throw new Error(`Cannot access books table: ${booksCheckError.message}`);
+      }
+
+      console.log('Books table check successful:', booksCheck);
+
+      // Try a simple matches query first
+      console.log('Fetching matches for user:', user.id);
+      const { data: simpleMatches, error: simpleError } = await supabase
+        .from('matches')
+        .select('id, status, requester_id, book_requested_id')
+        .eq('requester_id', user.id);
+
+      if (simpleError) {
+        console.error('Error with simple matches query:', simpleError);
+        throw new Error(`Simple matches query failed: ${simpleError.message}`);
+      }
+
+      console.log('Simple matches query successful:', simpleMatches);
+
+      // Now try with joined data
       const { data: requestedMatches, error: requestedError } = await supabase
         .from('matches')
         .select(`
@@ -161,36 +187,37 @@ const Matches = () => {
           requester_id,
           book_requested_id,
           book_offered_id,
-          requested_book:books!book_requested_id(
-            id,
-            title,
-            author,
-            cover_url,
-            condition,
-            genre,
-            user_id
-          ),
-          offered_book:books!book_offered_id(
-            id,
-            title,
-            author,
-            cover_url,
-            condition,
-            genre,
-            user_id
-          )
+          requested_book:books!book_requested_id(id, title, author, cover_url, condition, genre, user_id),
+          offered_book:books!book_offered_id(id, title, author, cover_url, condition, genre, user_id)
         `)
-        .eq('requester_id', user.id)
-        .returns<DatabaseMatch[]>();
+        .eq('requester_id', user.id);
 
       if (requestedError) {
-        console.error('Error fetching requested matches:', requestedError);
+        console.error('Error fetching requested matches:', {
+          error: requestedError,
+          details: requestedError.details,
+          message: requestedError.message,
+          hint: requestedError.hint,
+          code: requestedError.code
+        });
         throw new Error(`Failed to fetch requested matches: ${requestedError.message}`);
       }
 
-      console.log('Successfully fetched requested matches:', requestedMatches);
+      console.log('Requested matches:', requestedMatches);
 
       // Get matches where user owns the requested book
+      const userBooksQuery = await supabase
+        .from('books')
+        .select('id')
+        .eq('user_id', user.id);
+
+      if (userBooksQuery.error) {
+        console.error('Error fetching user books:', userBooksQuery.error);
+        throw new Error(`Failed to fetch user books: ${userBooksQuery.error.message}`);
+      }
+
+      const userBookIds = userBooksQuery.data.map(book => book.id);
+
       const { data: receivedMatches, error: receivedError } = await supabase
         .from('matches')
         .select(`
@@ -200,92 +227,28 @@ const Matches = () => {
           requester_id,
           book_requested_id,
           book_offered_id,
-          requested_book:books!book_requested_id(
-            id,
-            title,
-            author,
-            cover_url,
-            condition,
-            genre,
-            user_id
-          ),
-          offered_book:books!book_offered_id(
-            id,
-            title,
-            author,
-            cover_url,
-            condition,
-            genre,
-            user_id
-          )
+          requested_book:books!book_requested_id(id, title, author, cover_url, condition, genre, user_id),
+          offered_book:books!book_offered_id(id, title, author, cover_url, condition, genre, user_id)
         `)
-        .eq('requested_book.user_id', user.id)
-        .returns<DatabaseMatch[]>();
+        .in('book_requested_id', userBookIds);
 
       if (receivedError) {
-        console.error('Error fetching received matches:', receivedError);
+        console.error('Error fetching received matches:', {
+          error: receivedError,
+          details: receivedError.details,
+          message: receivedError.message,
+          hint: receivedError.hint,
+          code: receivedError.code
+        });
         throw new Error(`Failed to fetch received matches: ${receivedError.message}`);
       }
 
-      // Get requester information for received matches
-      const requesterIds = receivedMatches?.map(match => match.requester_id) || [];
-      const { data: requesterProfiles, error: profilesError } = await supabase
-        .from('auth.users')
-        .select('id, email, user_metadata')
-        .in('id', requesterIds)
-        .returns<UserProfile[]>();
+      console.log('Received matches:', receivedMatches);
 
-      if (profilesError) {
-        console.error('Error fetching requester profiles:', profilesError);
-      }
-
-      const requesterProfileMap = new Map(
-        requesterProfiles?.map(profile => [profile.id, profile]) || []
-      );
-
-      console.log('Successfully fetched received matches:', receivedMatches);
-
-      // Format received matches
-      const formattedReceivedMatches = (receivedMatches || []).map((match) => {
-        const requesterProfile = requesterProfileMap.get(match.requester_id);
-
+      // Format the matches with proper type checking
+      const formattedRequestedMatches = requestedMatches?.map((match: any) => {
         if (!match.requested_book) {
-          console.error('Missing requested book data for match:', match);
-          return null;
-        }
-
-        return {
-          id: match.id,
-          status: match.status,
-          requester: {
-            id: match.requester_id,
-            name: requesterProfile?.user_metadata?.name || 'Unknown User',
-            avatar: requesterProfile?.user_metadata?.avatar_url || '/placeholder.svg',
-          },
-          requested_book: {
-            id: match.requested_book.id,
-            title: match.requested_book.title || 'Unknown Title',
-            author: match.requested_book.author || 'Unknown Author',
-            cover: match.requested_book.cover_url || '/placeholder.svg',
-            condition: match.requested_book.condition || 'Good',
-            genre: match.requested_book.genre || 'Unknown',
-          },
-          offered_book: match.offered_book ? {
-            id: match.offered_book.id,
-            title: match.offered_book.title || 'Unknown Title',
-            author: match.offered_book.author || 'Unknown Author',
-            cover: match.offered_book.cover_url || '/placeholder.svg',
-            condition: match.offered_book.condition || 'Good',
-            genre: match.offered_book.genre || 'Unknown',
-          } : undefined,
-          created_at: match.created_at,
-        };
-      }).filter(Boolean) as MatchProps[];
-
-      // Format requested matches
-      const formattedRequestedMatches = (requestedMatches || []).map((match) => {
-        if (!match.requested_book) {
-          console.error('Missing requested book data for match:', match);
+          console.warn('Missing requested book data for match:', match);
           return null;
         }
 
@@ -294,24 +257,67 @@ const Matches = () => {
           status: match.status,
           requester: {
             id: user.id,
-            name: user.user_metadata?.name || 'You',
-            avatar: user.user_metadata?.avatar_url || '/placeholder.svg',
+            name: user.user_metadata.name || 'Unknown',
+            avatar: user.user_metadata.avatar_url || '',
           },
           requested_book: {
             id: match.requested_book.id,
-            title: match.requested_book.title || 'Unknown Title',
-            author: match.requested_book.author || 'Unknown Author',
-            cover: match.requested_book.cover_url || '/placeholder.svg',
+            title: match.requested_book.title,
+            author: match.requested_book.author,
+            cover: match.requested_book.cover_url || '',
             condition: match.requested_book.condition || 'Good',
             genre: match.requested_book.genre || 'Unknown',
+            user_id: match.requested_book.user_id,
+            owner_name: 'Unknown',
           },
           offered_book: match.offered_book ? {
             id: match.offered_book.id,
-            title: match.offered_book.title || 'Unknown Title',
-            author: match.offered_book.author || 'Unknown Author',
-            cover: match.offered_book.cover_url || '/placeholder.svg',
+            title: match.offered_book.title,
+            author: match.offered_book.author,
+            cover: match.offered_book.cover_url || '',
             condition: match.offered_book.condition || 'Good',
             genre: match.offered_book.genre || 'Unknown',
+            user_id: match.offered_book.user_id,
+            owner_name: 'Unknown',
+          } : undefined,
+          created_at: match.created_at,
+        };
+      }).filter(Boolean) as MatchProps[];
+
+      // Format received matches similarly
+      const formattedReceivedMatches = receivedMatches?.map((match: any) => {
+        if (!match.requested_book) {
+          console.warn('Missing requested book data for match:', match);
+          return null;
+        }
+
+        return {
+          id: match.id,
+          status: match.status,
+          requester: {
+            id: match.requester_id,
+            name: 'Unknown User',
+            avatar: '',
+          },
+          requested_book: {
+            id: match.requested_book.id,
+            title: match.requested_book.title,
+            author: match.requested_book.author,
+            cover: match.requested_book.cover_url || '',
+            condition: match.requested_book.condition || 'Good',
+            genre: match.requested_book.genre || 'Unknown',
+            user_id: match.requested_book.user_id,
+            owner_name: 'Unknown',
+          },
+          offered_book: match.offered_book ? {
+            id: match.offered_book.id,
+            title: match.offered_book.title,
+            author: match.offered_book.author,
+            cover: match.offered_book.cover_url || '',
+            condition: match.offered_book.condition || 'Good',
+            genre: match.offered_book.genre || 'Unknown',
+            user_id: match.offered_book.user_id,
+            owner_name: 'Unknown',
           } : undefined,
           created_at: match.created_at,
         };
@@ -322,8 +328,9 @@ const Matches = () => {
         requested: formattedRequestedMatches
       });
 
-      setReceivedMatches(formattedReceivedMatches);
-      setRequestedMatches(formattedRequestedMatches);
+      setReceivedMatches(formattedReceivedMatches || []);
+      setRequestedMatches(formattedRequestedMatches || []);
+
     } catch (error) {
       console.error('Detailed error in loadMatches:', {
         error,
@@ -333,13 +340,8 @@ const Matches = () => {
         user: user ? { id: user.id } : 'No user'
       });
       
-      // Show the specific error message to the user
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'An unexpected error occurred while fetching matches';
-      
-      toast.error(errorMessage, {
-        description: 'Please check the console for more details'
+      toast.error('Error loading matches', {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred'
       });
     } finally {
       setLoading(false);
@@ -462,268 +464,179 @@ const Matches = () => {
     }
   };
 
+  const handleOpenChat = (userId: string, userName: string) => {
+    setSelectedChat({ userId, userName });
+  };
+
+  const handleCloseChat = () => {
+    setSelectedChat(null);
+  };
+
   if (loading) {
-    return (
+  return (
       <div className="container mx-auto py-8 flex justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+        </div>
     );
   }
 
-  return (
-    <div className="container mx-auto py-8">
-      <div className="flex flex-col space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Book Matches</h1>
-        </div>
-
-        <Tabs defaultValue="received">
-          <TabsList className="mb-6">
-            <TabsTrigger value="received">Received Requests</TabsTrigger>
-            <TabsTrigger value="requested">My Requests</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="received">
-            {receivedMatches.length === 0 ? (
-              <div className="text-center py-16 border rounded-lg bg-card">
-                <div className="flex justify-center mb-4">
-                  <BookOpen className="h-12 w-12 text-muted-foreground" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No Match Requests</h3>
-                <p className="text-muted-foreground mb-6">
-                  You haven't received any match requests yet
-                </p>
-                <Button asChild>
-                  <Link to="/explore">Browse Books</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {receivedMatches.map((match) => (
-                  <Card key={match.id}>
-                    <CardHeader>
+  const renderMatchCard = (match: MatchProps, isReceived: boolean) => (
+    <Card key={match.id} className="mb-4">
+      <CardHeader>
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={match.requester.avatar} />
-                            <AvatarFallback>{match.requester.name.charAt(0)}</AvatarFallback>
+            <Avatar>
+              <AvatarImage src={match.requester.avatar} />
+              <AvatarFallback>{match.requester.name.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <CardTitle className="text-lg">{match.requester.name}</CardTitle>
-                            <CardDescription>
-                              Requested {new Date(match.created_at).toLocaleDateString()}
-                            </CardDescription>
+              <CardTitle className="text-lg">{match.requester.name}</CardTitle>
+              <CardDescription>
+                Requested {new Date(match.created_at).toLocaleDateString()}
+              </CardDescription>
+                            </div>
                           </div>
-                        </div>
-                        <Badge variant={
-                          match.status === 'pending' ? 'default' :
-                          match.status === 'accepted' ? 'secondary' :
-                          'destructive'
-                        }>
-                          {match.status.charAt(0).toUpperCase() + match.status.slice(1)}
+          <Badge variant={
+            match.status === 'pending' ? 'default' :
+            match.status === 'accepted' ? 'secondary' :
+            'destructive'
+          }>
+            {match.status.charAt(0).toUpperCase() + match.status.slice(1)}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent>
+      <CardContent>
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="sm:w-1/2">
-                          <h3 className="font-medium text-sm mb-2">They want:</h3>
+            <h3 className="font-medium text-sm mb-2">They want:</h3>
                           <div className="flex items-center gap-3 p-3 border rounded-lg">
                             <img
-                              src={match.requested_book.cover}
-                              alt={match.requested_book.title}
+                src={match.requested_book.cover}
+                alt={match.requested_book.title}
                               className="w-16 h-20 object-cover rounded"
                             />
                             <div>
                               <Link
-                                to={`/book/${match.requested_book.id}`}
+                  to={`/book/${match.requested_book.id}`}
                                 className="font-medium hover:underline line-clamp-1"
                               >
-                                {match.requested_book.title}
+                  {match.requested_book.title}
                               </Link>
                               <p className="text-xs text-muted-foreground">
-                                by {match.requested_book.author}
+                  by {match.requested_book.author}
                               </p>
                               <Badge
                                 variant="secondary"
                                 className="mt-2 text-xs px-2 py-0"
                               >
-                                {match.requested_book.condition}
+                  {match.requested_book.condition}
                               </Badge>
                             </div>
                           </div>
                         </div>
 
-                        {match.offered_book && (
+          {match.offered_book && (
                         <div className="sm:w-1/2">
                           <h3 className="font-medium text-sm mb-2">In exchange for:</h3>
-                            <div className="flex items-center gap-3 p-3 border rounded-lg">
-                              <img
-                                src={match.offered_book.cover}
-                                alt={match.offered_book.title}
-                                className="w-16 h-20 object-cover rounded"
-                              />
-                              <div>
-                                <Link
-                                  to={`/book/${match.offered_book.id}`}
-                                  className="font-medium hover:underline line-clamp-1"
-                                >
-                                  {match.offered_book.title}
-                                </Link>
+              <div className="flex items-center gap-3 p-3 border rounded-lg">
+                <img
+                  src={match.offered_book.cover}
+                  alt={match.offered_book.title}
+                  className="w-16 h-20 object-cover rounded"
+                />
+                <div>
+                  <Link
+                    to={`/book/${match.offered_book.id}`}
+                    className="font-medium hover:underline line-clamp-1"
+                  >
+                    {match.offered_book.title}
+                  </Link>
                                   <p className="text-xs text-muted-foreground">
-                                  by {match.offered_book.author}
-                                </p>
-                                <Badge
-                                  variant="secondary"
-                                  className="mt-2 text-xs px-2 py-0"
-                                >
-                                  {match.offered_book.condition}
-                                </Badge>
-                              </div>
-                            </div>
+                    by {match.offered_book.author}
+                  </p>
+                  <Badge
+                    variant="secondary"
+                    className="mt-2 text-xs px-2 py-0"
+                  >
+                    {match.offered_book.condition}
+                  </Badge>
                           </div>
-                        )}
+                        </div>
+            </div>
+          )}
                       </div>
                     </CardContent>
-                    {match.status === 'pending' && (
-                    <CardFooter className="flex justify-between bg-muted/20 px-4 py-3">
+      <CardFooter className="flex justify-between">
+        {match.status === 'pending' && isReceived && (
+          <div className="flex gap-2">
                       <Button
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+              variant="outline"
+              size="sm"
                         onClick={() => handleDeclineMatch(match.id)}
                       >
-                        <X className="mr-2 h-4 w-4" />
+              <X className="w-4 h-4 mr-1" />
                         Decline
-                      </Button>
-                      <div className="flex gap-2">
-                        <Button variant="outline" asChild>
-                            <Link to={`/messages/${match.requester.id}`}>
-                            <MessageCircle className="mr-2 h-4 w-4" />
-                            Message
-                          </Link>
                         </Button>
-                          <Button onClick={() => handleAcceptMatch(match.id)}>
-                          <Check className="mr-2 h-4 w-4" />
+                        <Button
+              size="sm"
+                          onClick={() => handleAcceptMatch(match.id)}
+                        >
+              <Check className="w-4 h-4 mr-1" />
                           Accept
                         </Button>
                       </div>
-                    </CardFooter>
-                    )}
-                  </Card>
-                ))}
-              </div>
+        )}
+        {match.status === 'accepted' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleOpenChat(
+              isReceived ? match.requester.id : match.requested_book.user_id,
+              isReceived ? match.requester.name : match.requested_book.owner_name
             )}
-          </TabsContent>
-
-          <TabsContent value="requested">
-            {requestedMatches.length === 0 ? (
-              <div className="text-center py-16 border rounded-lg bg-card">
-                <div className="flex justify-center mb-4">
-                  <BookOpen className="h-12 w-12 text-muted-foreground" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No Requests Made</h3>
-                <p className="text-muted-foreground mb-6">
-                  You haven't requested any books yet
-                </p>
-                <Button asChild>
-                  <Link to="/explore">Find Books</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {requestedMatches.map((match) => (
-                  <Card key={match.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                            <Avatar>
-                            <AvatarImage src={match.requester.avatar} />
-                            <AvatarFallback>{match.requester.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                          <div>
-                            <CardTitle className="text-lg">Your Request</CardTitle>
-                            <CardDescription>
-                              Sent {new Date(match.created_at).toLocaleDateString()}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant={
-                          match.status === 'pending' ? 'default' :
-                          match.status === 'accepted' ? 'secondary' :
-                          'destructive'
-                        }>
-                          {match.status.charAt(0).toUpperCase() + match.status.slice(1)}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="sm:w-1/2">
-                          <h3 className="font-medium text-sm mb-2">You want:</h3>
-                          <div className="flex items-center gap-3 p-3 border rounded-lg">
-                            <img
-                              src={match.requested_book.cover}
-                              alt={match.requested_book.title}
-                              className="w-16 h-20 object-cover rounded"
-                            />
-                            <div>
-                              <Link
-                                to={`/book/${match.requested_book.id}`}
-                                className="font-medium hover:underline line-clamp-1"
-                              >
-                                {match.requested_book.title}
-                              </Link>
-                              <p className="text-xs text-muted-foreground">
-                                by {match.requested_book.author}
-                              </p>
-                              <Badge
-                                variant="secondary"
-                                className="mt-2 text-xs px-2 py-0"
-                              >
-                                {match.requested_book.condition}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-
-                        {match.offered_book && (
-                          <div className="sm:w-1/2">
-                            <h3 className="font-medium text-sm mb-2">You offered:</h3>
-                            <div className="flex items-center gap-3 p-3 border rounded-lg">
-                              <img
-                                src={match.offered_book.cover}
-                                alt={match.offered_book.title}
-                                className="w-16 h-20 object-cover rounded"
-                                />
-                                <div>
-                                <Link
-                                  to={`/book/${match.offered_book.id}`}
-                                  className="font-medium hover:underline line-clamp-1"
-                                >
-                                  {match.offered_book.title}
-                                </Link>
-                                  <p className="text-xs text-muted-foreground">
-                                  by {match.offered_book.author}
-                                </p>
-                                <Badge
-                                  variant="secondary"
-                                  className="mt-2 text-xs px-2 py-0"
-                                >
-                                  {match.offered_book.condition}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
+          >
+            <MessageCircle className="w-4 h-4 mr-1" />
+            Chat
+                                  </Button>
+        )}
+        {match.status === 'declined' && (
+          <Badge variant="destructive">Declined</Badge>
+        )}
+      </CardFooter>
                   </Card>
-                ))}
-              </div>
-            )}
+  );
+
+  return (
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Book Matches</h1>
+      
+      <Tabs defaultValue="received" className="w-full">
+        <TabsList>
+          <TabsTrigger value="received">
+            Received Matches
+          </TabsTrigger>
+          <TabsTrigger value="requested">
+            Requested Matches
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="received">
+          {receivedMatches.map((match) => renderMatchCard(match, true))}
+        </TabsContent>
+
+        <TabsContent value="requested">
+          {requestedMatches.map((match) => renderMatchCard(match, false))}
           </TabsContent>
         </Tabs>
-      </div>
+
+      {selectedChat && (
+        <ChatDialog
+          isOpen={!!selectedChat}
+          onClose={() => handleCloseChat()}
+          userId={selectedChat.userId}
+          userName={selectedChat.userName}
+        />
+      )}
     </div>
   );
 };
